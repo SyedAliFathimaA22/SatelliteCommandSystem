@@ -1,0 +1,215 @@
+import java.util.Scanner;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
+import java.util.logging.Formatter;
+import java.util.logging.LogRecord;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.TimeZone;
+
+// Command Pattern Interface
+interface Command {
+    void execute();
+}
+
+// Concrete Command for Rotating the Satellite
+class RotateCommand implements Command {
+    private Satellite satellite;
+    private String direction;
+
+    public RotateCommand(Satellite satellite, String direction) {
+        this.satellite = satellite;
+        this.direction = direction;
+    }
+
+    @Override
+    public void execute() {
+        if (direction == null || direction.isEmpty()) {
+            Logger.getLogger(RotateCommand.class.getName()).log(Level.WARNING, "Invalid direction input.");
+            return;
+        }
+        satellite.rotate(direction);
+    }
+}
+
+// Concrete Command for Activating Solar Panels
+class ActivatePanelsCommand implements Command {
+    private Satellite satellite;
+
+    public ActivatePanelsCommand(Satellite satellite) {
+        this.satellite = satellite;
+    }
+
+    @Override
+    public void execute() {
+        satellite.activatePanels();
+    }
+}
+
+// Concrete Command for Deactivating Solar Panels
+class DeactivatePanelsCommand implements Command {
+    private Satellite satellite;
+
+    public DeactivatePanelsCommand(Satellite satellite) {
+        this.satellite = satellite;
+    }
+
+    @Override
+    public void execute() {
+        satellite.deactivatePanels();
+    }
+}
+
+// Concrete Command for Collecting Data
+class CollectDataCommand implements Command {
+    private Satellite satellite;
+
+    public CollectDataCommand(Satellite satellite) {
+        this.satellite = satellite;
+    }
+
+    @Override
+    public void execute() {
+        satellite.collectData();
+    }
+}
+
+// Singleton Pattern for Satellite class
+class Satellite {
+    private static final Logger LOGGER = Logger.getLogger(Satellite.class.getName());
+    private static Satellite instance;
+    private String orientation;
+    private String solarPanels;
+    private int dataCollected;
+
+    private Satellite() {
+        this.orientation = "North";
+        this.solarPanels = "Inactive";
+        this.dataCollected = 0;
+    }
+
+    public static Satellite getInstance() {
+        if (instance == null) {
+            instance = new Satellite();
+        }
+        return instance;
+    }
+
+    public void rotate(String direction) {
+        try {
+            if (direction.equalsIgnoreCase("North") || 
+                direction.equalsIgnoreCase("South") || 
+                direction.equalsIgnoreCase("East") || 
+                direction.equalsIgnoreCase("West")) {
+                this.orientation = direction;
+                LOGGER.log(Level.INFO, "Satellite rotated to " + direction);
+            } else {
+                throw new IllegalArgumentException("Invalid direction: " + direction);
+            }
+        } catch (IllegalArgumentException e) {
+            LOGGER.log(Level.WARNING, e.getMessage());
+        }
+    }
+
+    public void activatePanels() {
+        this.solarPanels = "Active";
+        LOGGER.log(Level.INFO, "Solar panels activated.");
+    }
+
+    public void deactivatePanels() {
+        this.solarPanels = "Inactive";
+        LOGGER.log(Level.INFO, "Solar panels deactivated.");
+    }
+
+    public void collectData() {
+        if (this.solarPanels.equalsIgnoreCase("Active")) {
+            this.dataCollected += 10;
+            LOGGER.log(Level.INFO, "Data collected: " + this.dataCollected);
+        } else {
+            this.dataCollected = 0;
+            LOGGER.log(Level.INFO, "Data collection reset due to inactive panels.");
+        }
+    }
+
+    public void printStatus() {
+        LOGGER.log(Level.INFO, "Status - Orientation: " + this.orientation + ", Solar Panels: " + this.solarPanels + 
+                               ", Data Collected: " + this.dataCollected);
+    }
+}
+
+// Main class with command line interface
+public class Main {
+    private static final Logger LOGGER = Logger.getLogger(Main.class.getName());
+
+    public static void main(String[] args) {
+        // Set the default time zone to ensure logs show the correct local time
+        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Kolkata"));
+
+        // Configure the logger to use a custom formatter to display the correct time zone
+        ConsoleHandler consoleHandler = new ConsoleHandler();
+        consoleHandler.setFormatter(new SimpleFormatter() {
+            private final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+            @Override
+            public String format(LogRecord record) {
+                sdf.setTimeZone(TimeZone.getTimeZone("Asia/Kolkata"));
+                return String.format("%s %s %s%n",
+                        sdf.format(new Date(record.getMillis())),
+                        record.getLevel().getLocalizedName(),
+                        formatMessage(record));
+            }
+        });
+
+        LOGGER.addHandler(consoleHandler);
+        LOGGER.setUseParentHandlers(false); // Disable parent handlers to avoid duplicate logging
+
+        Satellite satellite = Satellite.getInstance();
+        Scanner scanner = new Scanner(System.in);
+        boolean continueProgram = true;
+
+        while (continueProgram) {
+            try {
+                System.out.println("Do you want to rotate the satellite? (Yes/No): ");
+                String rotateChoice = scanner.nextLine().trim();
+
+                if (rotateChoice.equalsIgnoreCase("Yes")) {
+                    System.out.println("Enter direction (North, South, East, West): ");
+                    String direction = scanner.nextLine().trim();
+                    Command rotate = new RotateCommand(satellite, direction);
+                    rotate.execute();
+                }
+
+                System.out.println("Enter solar panel status (Active/Inactive): ");
+                String solarStatus = scanner.nextLine().trim();
+
+                if (solarStatus.equalsIgnoreCase("Active")) {
+                    Command activatePanels = new ActivatePanelsCommand(satellite);
+                    activatePanels.execute();
+                } else if (solarStatus.equalsIgnoreCase("Inactive")) {
+                    Command deactivatePanels = new DeactivatePanelsCommand(satellite);
+                    deactivatePanels.execute();
+                } else {
+                    System.out.println("Invalid solar panel status. Please enter 'Active' or 'Inactive'.");
+                    LOGGER.log(Level.WARNING, "Invalid solar panel status input: " + solarStatus);
+                }
+
+                Command collectData = new CollectDataCommand(satellite);
+                collectData.execute();
+
+                satellite.printStatus();
+
+                System.out.println("Do you want to continue? (Yes/No): ");
+                String continueChoice = scanner.nextLine().trim();
+                continueProgram = continueChoice.equalsIgnoreCase("Yes");
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "An error occurred: " + e.getMessage());
+                continueProgram = false; // Exit program on unexpected error
+            }
+        }
+
+        scanner.close();
+        LOGGER.log(Level.INFO, "Program terminated.");
+    }
+}
